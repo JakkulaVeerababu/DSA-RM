@@ -102,6 +102,60 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Touch Panning & Pinch-to-Zoom (Mobile/Tablet SaaS Standard)
+  let touchStartDist = 0;
+  let touchStartScale = 1;
+
+  container.addEventListener("touchstart", (e) => {
+    if (e.target.closest(".tree-node") || e.target.closest(".central-node") || e.target.closest(".canvas-controls") || e.target.closest(".control-btn")) return;
+
+    if (e.touches.length === 1) {
+      isDragging = true;
+      startX = e.touches[0].clientX - panX;
+      startY = e.touches[0].clientY - panY;
+    } else if (e.touches.length === 2) {
+      isDragging = false;
+      touchStartDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      touchStartScale = zoomScale;
+    }
+  }, { passive: true });
+
+  window.addEventListener("touchmove", (e) => {
+    if (isDragging && e.touches.length === 1) {
+      panX = e.touches[0].clientX - startX;
+      panY = e.touches[0].clientY - startY;
+      updateCanvasTransform();
+    } else if (e.touches.length === 2) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      if (touchStartDist > 0) {
+        const factor = dist / touchStartDist;
+        zoomScale = Math.max(0.12, Math.min(3.0, touchStartScale * factor));
+        
+        // Pivot zoom on center of pinch
+        const rect = container.getBoundingClientRect();
+        const pinchX = (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left;
+        const pinchY = (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top;
+        
+        // Soft adjust translate positions to make pinch centered
+        panX = pinchX - (pinchX - panX) * (zoomScale / touchStartScale);
+        panY = pinchY - (pinchY - panY) * (zoomScale / touchStartScale);
+        
+        updateCanvasTransform();
+      }
+    }
+  }, { passive: true });
+
+  window.addEventListener("touchend", () => {
+    isDragging = false;
+    touchStartDist = 0;
+  });
+
   // Scroll Mouse Panning & Ctrl/Pinch Zooming (SaaS Standard)
   container.addEventListener("wheel", (e) => {
     e.preventDefault();
