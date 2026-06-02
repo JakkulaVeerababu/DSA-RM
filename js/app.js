@@ -41,7 +41,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let zoomScale = 0.65; // Zoom out slightly on load to show entire massive tree
   let panX = -200;      // Shift to center the massive mind-map initially
-  let panY = -2300;
+  let panY = -2850;     // Mathematically perfect vertical center
   let isDragging = false;
   let startX = 0, startY = 0;
 
@@ -148,9 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   btnZoomReset.addEventListener("click", () => {
     zoomScale = 0.65;
-    panX = -200;
-    panY = -2300;
-    updateCanvasTransform();
+    centerCanvasOnRootNode();
   });
 
   // 3. LocalStorage Check persistence
@@ -893,17 +891,31 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   };
 
+  // Dynamic layout auto-centering calculator based on exact parent dimensions
+  const centerCanvasOnRootNode = () => {
+    const rect = container.getBoundingClientRect();
+    const viewportWidth = rect.width || window.innerWidth * 0.53;
+    const viewportHeight = rect.height || window.innerHeight;
+    
+    if (viewportHeight <= 0) return;
+
+    panX = 60 - 400 * zoomScale;
+    panY = (viewportHeight / 2) - (5000 * zoomScale);
+    updateCanvasTransform();
+  };
+
   // 12. Startup Dashboard
   loadMasteredState();
   initTreeStates();
   renderTreeLayout();
-  updateCanvasTransform();
+  centerCanvasOnRootNode(); // Center root node vertically & horizontally dynamically!
   updateCategoryIndicator();
   renderPatterns();
   updateProgressStats();
 
-  // Redraw connections on window resize
+  // Redraw connections and re-center on window resize
   window.addEventListener("resize", () => {
     renderTreeLayout();
+    centerCanvasOnRootNode();
   });
 });

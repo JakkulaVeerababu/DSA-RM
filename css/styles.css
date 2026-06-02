@@ -1196,3 +1196,29 @@ footer {
     height: auto;
   }
 }
+
+@media (max-width: 768px) {
+  header {
+    height: auto;
+    padding: 16px 20px;
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .header-stats {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .stat-bubble {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+  }
+  
+  .mindmap-container {
+    height: 380px; /* slightly smaller on mobile to allow scrolling past container */
+  }
+}
