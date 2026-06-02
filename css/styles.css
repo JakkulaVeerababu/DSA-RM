@@ -1222,3 +1222,17 @@ footer {
     height: 380px; /* slightly smaller on mobile to allow scrolling past container */
   }
 }
+
+/* Creator Social link items style */
+.social-link {
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.social-link:hover {
+  color: var(--color-purple);
+  transform: translateY(-1.5px) scale(1.12);
+}
