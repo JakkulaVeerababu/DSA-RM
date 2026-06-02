@@ -324,6 +324,25 @@ document.addEventListener("DOMContentLoaded", () => {
           renderPatterns();
 
           // Toggle collapse/expand on branch nodes
+          const depth = getNodeDepth(node, virtualRoot);
+          const wasCollapsed = node.collapsed;
+
+          if (depth === 0 && wasCollapsed) {
+            // Collapse all other primary categories and their nested child sub-branches recursively
+            window.dsaData.categories.forEach(cat => {
+              if (cat !== node) {
+                cat.collapsed = true;
+                const recurseCollapse = (sn) => {
+                  if (sn.children) {
+                    sn.collapsed = true;
+                    sn.children.forEach(recurseCollapse);
+                  }
+                };
+                if (cat.children) cat.children.forEach(recurseCollapse);
+              }
+            });
+          }
+
           node.collapsed = !node.collapsed;
           
           // Re-render
