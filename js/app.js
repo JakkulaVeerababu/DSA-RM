@@ -12,6 +12,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const mindmapSvg = document.getElementById("mindmapSvg");
   const patternsList = document.getElementById("patternsList");
   const searchInput = document.getElementById("searchInput");
+  const explorerContainer = document.getElementById("explorerContainer");
+  const dockBtnMap = document.getElementById("dockBtnMap");
+  const dockBtnExplorer = document.getElementById("dockBtnExplorer");
   
   // Progress Ring & Stats
   const globalMasteredCount = document.getElementById("globalMasteredCount");
@@ -958,6 +961,38 @@ document.addEventListener("DOMContentLoaded", () => {
     updateCanvasTransform();
   };
 
+  // 11.5 Mobile Segmented View Controller
+  const initMobileViewToggle = () => {
+    if (!dockBtnMap || !dockBtnExplorer) return;
+
+    const showMapView = () => {
+      dockBtnMap.classList.add("active");
+      dockBtnExplorer.classList.remove("active");
+      container.classList.remove("mobile-hide-view");
+      explorerContainer.classList.add("mobile-hide-view");
+      
+      // Re-center map inside the new full viewport space!
+      setTimeout(() => {
+        centerCanvasOnRootNode();
+      }, 50);
+    };
+
+    const showExplorerView = () => {
+      dockBtnExplorer.classList.add("active");
+      dockBtnMap.classList.remove("active");
+      container.classList.add("mobile-hide-view");
+      explorerContainer.classList.remove("mobile-hide-view");
+    };
+
+    dockBtnMap.addEventListener("click", showMapView);
+    dockBtnExplorer.addEventListener("click", showExplorerView);
+
+    // Initial setup for mobile viewport size on load
+    if (window.innerWidth <= 1024) {
+      showMapView();
+    }
+  };
+
   // 12. Startup Dashboard
   loadMasteredState();
   initTreeStates();
@@ -966,9 +1001,22 @@ document.addEventListener("DOMContentLoaded", () => {
   updateCategoryIndicator();
   renderPatterns();
   updateProgressStats();
+  initMobileViewToggle();
 
   // Redraw connections and re-center on window resize
   window.addEventListener("resize", () => {
+    if (window.innerWidth > 1024) {
+      container.classList.remove("mobile-hide-view");
+      explorerContainer.classList.remove("mobile-hide-view");
+    } else {
+      if (dockBtnMap && dockBtnMap.classList.contains("active")) {
+        container.classList.remove("mobile-hide-view");
+        explorerContainer.classList.add("mobile-hide-view");
+      } else if (dockBtnExplorer && dockBtnExplorer.classList.contains("active")) {
+        container.classList.add("mobile-hide-view");
+        explorerContainer.classList.remove("mobile-hide-view");
+      }
+    }
     renderTreeLayout();
     centerCanvasOnRootNode();
   });

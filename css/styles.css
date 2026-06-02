@@ -1176,50 +1176,199 @@ footer {
 }
 
 /* responsive details */
+/* Floating Mobile Toggle Dock */
+.mobile-toggle-dock {
+  display: none; /* Hidden on desktop */
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 99px;
+  padding: 6px;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.12), 0 4px 12px rgba(15, 23, 42, 0.04);
+  width: max-content;
+  max-width: 90%;
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translate(-50%, 40px);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.mobile-dock-btn {
+  background: transparent;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 99px;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.mobile-dock-btn:hover {
+  color: var(--text-primary);
+}
+
+.mobile-dock-btn.active {
+  background: var(--text-primary);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-sm);
+}
+
+.mobile-dock-btn svg {
+  transition: transform var(--transition-fast);
+}
+
+.mobile-dock-btn.active svg {
+  transform: scale(1.05);
+}
+
 @media (max-width: 1024px) {
   body {
-    height: auto;
-    overflow-y: auto;
+    height: 100vh;
+    height: -webkit-fill-available;
+    overflow: hidden;
   }
+  
+  header {
+    height: 60px;
+    padding: 0 20px;
+  }
+  
+  .logo-section h1 {
+    font-size: 1.1rem;
+  }
+  
+  .creator-socials {
+    display: none !important; /* Hide header socials in mobile to save space */
+  }
+
   main {
-    flex-direction: column;
-    overflow: visible;
+    height: calc(100vh - 60px);
+    height: calc(-webkit-fill-available - 60px);
+    flex-direction: row !important; /* Toggle hides inactive container instead of stacking */
+    overflow: hidden;
   }
+
   .mindmap-container {
-    width: 100%;
-    height: 480px;
+    width: 100% !important;
+    height: 100% !important;
     border-right: none;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: none;
   }
+
   .explorer-container {
+    width: 100% !important;
+    height: 100% !important;
+    padding: 20px;
+    overflow-y: auto;
+    border-left: none;
+    padding-bottom: 100px; /* Space for mobile floating toggle dock */
+  }
+  
+  .explorer-header {
+    padding: 16px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .progress-info {
     width: 100%;
-    height: auto;
+  }
+  
+  .progress-bar-container {
+    width: 100%;
+  }
+  
+  .circle-progress-container {
+    display: none; /* Hide circular meter in mobile to save screen width */
+  }
+
+  .mobile-toggle-dock {
+    display: flex; /* Show floating toggle dock */
+  }
+
+  .mobile-hide-view {
+    display: none !important;
+  }
+  
+  footer {
+    display: none; /* Hide desktop footer */
   }
 }
 
 @media (max-width: 768px) {
   header {
     height: auto;
-    padding: 16px 20px;
+    padding: 12px 16px;
     flex-direction: column;
-    gap: 12px;
     align-items: flex-start;
+    gap: 8px;
+  }
+  
+  main {
+    height: calc(100vh - 90px);
+    height: calc(-webkit-fill-available - 90px);
   }
   
   .header-stats {
     width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
     gap: 8px;
   }
   
   .stat-bubble {
     padding: 4px 10px;
-    font-size: 0.78rem;
+    font-size: 0.72rem;
+    border-radius: 8px;
   }
   
-  .mindmap-container {
-    height: 380px; /* slightly smaller on mobile to allow scrolling past container */
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .difficulty-filters {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .filter-btn {
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .canvas-controls {
+    top: 15px;
+    left: 15px;
+    padding: 3px 6px;
+  }
+  
+  .control-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 0.85rem;
   }
 }
 
