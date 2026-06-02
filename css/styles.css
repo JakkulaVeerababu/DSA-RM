@@ -1246,14 +1246,14 @@ footer {
 
 @media (max-width: 1024px) {
   body {
-    height: 100vh;
-    height: -webkit-fill-available;
-    overflow: hidden;
+    height: 100vh !important;
+    overflow: hidden !important;
   }
   
   header {
     height: 60px;
     padding: 0 20px;
+    flex-shrink: 0 !important;
   }
   
   .logo-section h1 {
@@ -1265,26 +1265,30 @@ footer {
   }
 
   main {
-    height: calc(100vh - 60px);
-    height: calc(-webkit-fill-available - 60px);
+    flex: 1 !important;
+    display: flex !important;
     flex-direction: row !important; /* Toggle hides inactive container instead of stacking */
-    overflow: hidden;
+    overflow: hidden !important;
+    height: auto !important;
   }
 
   .mindmap-container {
+    flex: 1 !important;
     width: 100% !important;
     height: 100% !important;
     border-right: none;
     border-bottom: none;
+    display: block !important;
   }
 
   .explorer-container {
+    flex: 1 !important;
     width: 100% !important;
     height: 100% !important;
     padding: 20px;
-    overflow-y: auto;
+    overflow-y: auto !important;
     border-left: none;
-    padding-bottom: 100px; /* Space for mobile floating toggle dock */
+    padding-bottom: 100px !important; /* Space for mobile floating toggle dock */
   }
   
   .explorer-header {
@@ -1326,11 +1330,15 @@ footer {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+    flex-shrink: 0 !important;
   }
   
   main {
-    height: calc(100vh - 90px);
-    height: calc(-webkit-fill-available - 90px);
+    flex: 1 !important;
+    display: flex !important;
+    flex-direction: row !important;
+    overflow: hidden !important;
+    height: auto !important;
   }
   
   .header-stats {
