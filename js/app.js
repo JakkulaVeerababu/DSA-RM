@@ -4,6 +4,11 @@ document.addEventListener("DOMContentLoaded", () => {
   // 1. Core State
   let masteredPatterns = new Set();
   let activePathNodes = new Set(); // Stores path of selected nodes for glowing curves
+  let currentUser = null;
+  let currentConnections = [];
+  let lineUpdateAnimationId = null;
+  let hasDragged = false;
+  let clickStartX = 0, clickStartY = 0;
   
   // Zoom & Pan Coordinates
   const container = document.getElementById("mindmapContainer");
@@ -81,18 +86,47 @@ document.addEventListener("DOMContentLoaded", () => {
     canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${zoomScale})`;
   };
 
+  const smoothCenterOnNode = (node) => {
+    if (!container || !canvas) return;
+    const rect = container.getBoundingClientRect();
+    const viewportWidth = rect.width || window.innerWidth * 0.53;
+    const viewportHeight = rect.height || window.innerHeight;
+    
+    const nodeWidth = node.name === "DSA Patterns" ? 240 : 260;
+    
+    // Target coordinate layout center
+    const targetPanX = (viewportWidth / 2) - (node.x + nodeWidth / 2) * zoomScale;
+    const targetPanY = (viewportHeight / 2) - (node.y) * zoomScale;
+    
+    canvas.classList.add("smooth-pan");
+    panX = targetPanX;
+    panY = targetPanY;
+    updateCanvasTransform();
+    
+    setTimeout(() => {
+      canvas.classList.remove("smooth-pan");
+    }, 450);
+  };
+
   // Drag Panning
   container.addEventListener("mousedown", (e) => {
-    if (e.target.closest(".tree-node") || e.target.closest(".central-node") || e.target.closest(".canvas-controls") || e.target.closest(".control-btn")) return;
+    if (e.target.closest(".canvas-controls") || e.target.closest(".control-btn") || e.target.closest(".mastery-checkbox-wrapper") || e.target.tagName === "INPUT") return;
     
     isDragging = true;
+    hasDragged = false;
     startX = e.clientX - panX;
     startY = e.clientY - panY;
+    clickStartX = e.clientX;
+    clickStartY = e.clientY;
     container.style.cursor = "grabbing";
   });
 
   window.addEventListener("mousemove", (e) => {
     if (!isDragging) return;
+    const dist = Math.hypot(e.clientX - clickStartX, e.clientY - clickStartY);
+    if (dist > 6) {
+      hasDragged = true;
+    }
     panX = e.clientX - startX;
     panY = e.clientY - startY;
     updateCanvasTransform();
@@ -110,12 +144,15 @@ document.addEventListener("DOMContentLoaded", () => {
   let touchStartScale = 1;
 
   container.addEventListener("touchstart", (e) => {
-    if (e.target.closest(".tree-node") || e.target.closest(".central-node") || e.target.closest(".canvas-controls") || e.target.closest(".control-btn")) return;
+    if (e.target.closest(".canvas-controls") || e.target.closest(".control-btn") || e.target.closest(".mastery-checkbox-wrapper") || e.target.tagName === "INPUT") return;
 
     if (e.touches.length === 1) {
       isDragging = true;
+      hasDragged = false;
       startX = e.touches[0].clientX - panX;
       startY = e.touches[0].clientY - panY;
+      clickStartX = e.touches[0].clientX;
+      clickStartY = e.touches[0].clientY;
     } else if (e.touches.length === 2) {
       isDragging = false;
       touchStartDist = Math.hypot(
@@ -124,10 +161,19 @@ document.addEventListener("DOMContentLoaded", () => {
       );
       touchStartScale = zoomScale;
     }
-  }, { passive: true });
+  }, { passive: false });
 
-  window.addEventListener("touchmove", (e) => {
+  container.addEventListener("touchmove", (e) => {
+    // Prevent mobile page scroll bounce when interacting with the canvas
+    if (isDragging || e.touches.length === 2) {
+      if (e.cancelable) e.preventDefault();
+    }
+
     if (isDragging && e.touches.length === 1) {
+      const dist = Math.hypot(e.touches[0].clientX - clickStartX, e.touches[0].clientY - clickStartY);
+      if (dist > 6) {
+        hasDragged = true;
+      }
       panX = e.touches[0].clientX - startX;
       panY = e.touches[0].clientY - startY;
       updateCanvasTransform();
@@ -152,7 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
         updateCanvasTransform();
       }
     }
-  }, { passive: true });
+  }, { passive: false });
 
   window.addEventListener("touchend", () => {
     isDragging = false;
@@ -293,6 +339,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!root.dataset.hasListener) {
         root.dataset.hasListener = "true";
         root.addEventListener("click", () => {
+          if (hasDragged) return; // Ignore clicks if dragging occurred
           selectedCategory = "all";
           activePathNodes.clear();
           updateCategoryIndicator();
@@ -337,6 +384,14 @@ document.addEventListener("DOMContentLoaded", () => {
     visibleNodesSet.forEach(node => {
       let element = nodeDomMap.get(node);
 
+      if (element) {
+        // If there was a pending prune timeout (collapsing), cancel it!
+        if (element.dataset.pruneTimeoutId) {
+          clearTimeout(parseInt(element.dataset.pruneTimeoutId));
+          delete element.dataset.pruneTimeoutId;
+        }
+      }
+
       if (!element) {
         // Create new Node DOM card
         element = document.createElement("div");
@@ -347,8 +402,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const startX = parentNode ? parentNode.x : virtualRoot.x;
         const startY = parentNode ? parentNode.y : virtualRoot.y;
         
-        element.style.left = `${startX}px`;
-        element.style.top = `${startY - 21}px`;
+        element.style.transform = `translate(${startX}px, ${startY - 21}px)`;
         element.style.opacity = "0";
 
         // Assign levels styles
@@ -363,10 +417,13 @@ document.addEventListener("DOMContentLoaded", () => {
           // Skip if clicking completion checks
           if (e.target.closest(".mastery-checkbox-wrapper") || e.target.tagName === "INPUT" || e.target.closest(".checkmark")) return;
 
+          if (hasDragged) return; // Ignore click if dragging occurred
+
           if (node.isPattern) {
             // Highlight path leading to this pattern
             highlightActivePath(node, virtualRoot);
             openPatternDrawer(node, catNameOfNode(node), catColorOfNode(node, virtualRoot));
+            smoothCenterOnNode(node);
             return;
           }
 
@@ -402,6 +459,11 @@ document.addEventListener("DOMContentLoaded", () => {
           
           // Re-render
           renderTreeLayout();
+
+          // Auto-center node so child branches fit cleanly in screen viewport
+          setTimeout(() => {
+            smoothCenterOnNode(node);
+          }, 50);
         });
 
         treeWrapper.appendChild(element);
@@ -411,8 +473,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Transition to final absolute coordinates
       // Bounded card dimensions: width=260px, height=42px (so top offset = y - 21px)
       setTimeout(() => {
-        element.style.left = `${node.x}px`;
-        element.style.top = `${node.y - 21}px`;
+        element.style.transform = `translate(${node.x}px, ${node.y - 21}px)`;
         element.style.opacity = "1";
         
         // Sync active check styling dynamically
@@ -434,31 +495,47 @@ document.addEventListener("DOMContentLoaded", () => {
     // 4. Prune/Remove collapsed/invisible elements
     nodeDomMap.forEach((element, node) => {
       if (!visibleNodesSet.has(node)) {
-        // Find parent's coordinates to collapse inwards smoothly!
-        const parentNode = findParentNode(node, virtualRoot);
-        const endX = parentNode ? parentNode.x : virtualRoot.x;
-        const endY = parentNode ? parentNode.y : virtualRoot.y;
+        // Only trigger collapse if not already collapsing
+        if (!element.dataset.pruneTimeoutId) {
+          const parentNode = findParentNode(node, virtualRoot);
+          const endX = parentNode ? parentNode.x : virtualRoot.x;
+          const endY = parentNode ? parentNode.y : virtualRoot.y;
 
-        element.style.left = `${endX}px`;
-        element.style.top = `${endY - 21}px`;
-        element.style.opacity = "0";
-        
-        setTimeout(() => {
-          element.remove();
-        }, 400); // match transition timeline
+          element.style.transform = `translate(${endX}px, ${endY - 21}px)`;
+          element.style.opacity = "0";
+          
+          const timeoutId = setTimeout(() => {
+            element.remove();
+            nodeDomMap.delete(node);
+          }, 400); // match transition timeline
 
-        nodeDomMap.delete(node);
+          element.dataset.pruneTimeoutId = timeoutId;
+        }
       }
     });
 
     // 5. Redraw connection Bezier curves
-    // Clear SVG viewport
-    const svgPaths = mindmapSvg.querySelectorAll(".connector-line");
-    svgPaths.forEach(p => p.remove());
+    currentConnections = connectionsList;
 
-    connectionsList.forEach(conn => {
-      drawBezierConnection(conn.parent, conn.child, conn.color, conn.isActive);
+    // Collect collapsing node connections to animate them back to parent
+    nodeDomMap.forEach((element, node) => {
+      if (!visibleNodesSet.has(node)) {
+        const parentNode = findParentNode(node, virtualRoot);
+        if (parentNode) {
+          const currColor = catColorOfNode(node, virtualRoot);
+          currentConnections.push({
+            parent: parentNode,
+            child: node,
+            color: currColor,
+            isActive: false,
+            isCollapsing: true
+          });
+        }
+      }
     });
+
+    // Start requestAnimationFrame update loop to animate curves
+    startLineUpdateLoop();
   };
 
   // Populate inner node markup depending on levels/types
@@ -511,9 +588,11 @@ document.addEventListener("DOMContentLoaded", () => {
         if (checkbox.checked) {
           masteredPatterns.add(node.id);
           element.classList.add("mastered");
+          if (currentUser) window.dsaSupabase.addProgress(currentUser.id, node.id);
         } else {
           masteredPatterns.delete(node.id);
           element.classList.remove("mastered");
+          if (currentUser) window.dsaSupabase.removeProgress(currentUser.id, node.id);
         }
         saveMasteredState();
         updateProgressStats();
@@ -523,15 +602,14 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   // Draw Bezier curves connecting parent right edge to child left edge
-  const drawBezierConnection = (parent, child, color, isActive) => {
+  const drawBezierConnection = (parent, child, parentCoords, childCoords, color, isActive, opacity = null) => {
     const parentWidth = parent.name === "DSA Patterns" ? 240 : 260;
-    const childWidth = 260;
 
-    const xStart = parent.x + parentWidth;
-    const yStart = parent.y;
+    const xStart = parentCoords.x + parentWidth;
+    const yStart = parentCoords.y;
     
-    const xEnd = child.x;
-    const yEnd = child.y;
+    const xEnd = childCoords.x;
+    const yEnd = childCoords.y;
 
     const controlX = xStart + (xEnd - xStart) * 0.45;
 
@@ -544,8 +622,74 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       path.setAttribute("stroke", "rgba(107, 114, 128, 0.25)");
     }
+    
+    if (opacity !== null) {
+      path.style.opacity = opacity;
+    }
     path.style.color = color;
     mindmapSvg.appendChild(path);
+  };
+
+  const getNodeVisualCoords = (node) => {
+    if (node.name === "DSA Patterns") {
+      return { x: node.x, y: node.y };
+    }
+    const element = nodeDomMap.get(node);
+    if (!element) {
+      return { x: node.x, y: node.y };
+    }
+    const style = window.getComputedStyle(element);
+    const matrix = style.transform || style.webkitTransform;
+    if (matrix && matrix !== 'none') {
+      const parts = matrix.split('(')[1].split(')')[0].split(',');
+      const tx = parseFloat(parts[4]);
+      const ty = parseFloat(parts[5]);
+      return { x: tx, y: ty + 21 }; // y is ty + 21 because the card's translate is y - 21
+    }
+    return { x: node.x, y: node.y };
+  };
+
+  const updateLines = () => {
+    // Clear SVG viewport
+    const svgPaths = mindmapSvg.querySelectorAll(".connector-line");
+    svgPaths.forEach(p => p.remove());
+
+    currentConnections.forEach(conn => {
+      const parentCoords = getNodeVisualCoords(conn.parent);
+      const childCoords = getNodeVisualCoords(conn.child);
+      
+      let opacity = null;
+      if (conn.isCollapsing) {
+        const element = nodeDomMap.get(conn.child);
+        if (element) {
+          opacity = window.getComputedStyle(element).opacity;
+        } else {
+          opacity = 0;
+        }
+      }
+      
+      drawBezierConnection(conn.parent, conn.child, parentCoords, childCoords, conn.color, conn.isActive, opacity);
+    });
+  };
+
+  const startLineUpdateLoop = () => {
+    const duration = 550; // slightly longer than CSS transition (450ms) to ensure it settles
+    const startTime = performance.now();
+    
+    const animate = (time) => {
+      updateLines();
+      if (time - startTime < duration) {
+        lineUpdateAnimationId = requestAnimationFrame(animate);
+      } else {
+        updateLines();
+        lineUpdateAnimationId = null;
+      }
+    };
+
+    if (lineUpdateAnimationId) {
+      cancelAnimationFrame(lineUpdateAnimationId);
+    }
+    lineUpdateAnimationId = requestAnimationFrame(animate);
   };
 
   // Highlight connections trail leading to pattern
@@ -827,8 +971,10 @@ document.addEventListener("DOMContentLoaded", () => {
         e.stopPropagation();
         if (checkbox.checked) {
           masteredPatterns.add(pat.id);
+          if (currentUser) window.dsaSupabase.addProgress(currentUser.id, pat.id);
         } else {
           masteredPatterns.delete(pat.id);
+          if (currentUser) window.dsaSupabase.removeProgress(currentUser.id, pat.id);
         }
         saveMasteredState();
         updateProgressStats();
@@ -964,12 +1110,12 @@ document.addEventListener("DOMContentLoaded", () => {
   // 11.5 Mobile Segmented View Controller
   const initMobileViewToggle = () => {
     if (!dockBtnMap || !dockBtnExplorer) return;
+    const mainEl = document.querySelector("main");
 
     const showMapView = () => {
       dockBtnMap.classList.add("active");
       dockBtnExplorer.classList.remove("active");
-      container.classList.remove("mobile-hide-view");
-      explorerContainer.classList.add("mobile-hide-view");
+      if (mainEl) mainEl.classList.remove("view-explorer");
       
       // Re-center map inside the new full viewport space!
       setTimeout(() => {
@@ -980,8 +1126,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const showExplorerView = () => {
       dockBtnExplorer.classList.add("active");
       dockBtnMap.classList.remove("active");
-      container.classList.add("mobile-hide-view");
-      explorerContainer.classList.remove("mobile-hide-view");
+      if (mainEl) mainEl.classList.add("view-explorer");
     };
 
     dockBtnMap.addEventListener("click", showMapView);
@@ -993,6 +1138,198 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  // 11.8 Auth UI and Event Handlers
+  const btnShowAuth = document.getElementById("btnShowAuth");
+  const authSection = document.getElementById("authSection");
+  const userProfileMenu = document.getElementById("userProfileMenu");
+  const userEmailDisplay = document.getElementById("userEmailDisplay");
+  const btnLogout = document.getElementById("btnLogout");
+  
+  const authModalOverlay = document.getElementById("authModalOverlay");
+  const closeAuthBtn = document.getElementById("closeAuthBtn");
+  const authForm = document.getElementById("authForm");
+  const authEmail = document.getElementById("authEmail");
+  const authPassword = document.getElementById("authPassword");
+  const confirmPasswordGroup = document.getElementById("confirmPasswordGroup");
+  const authConfirmPassword = document.getElementById("authConfirmPassword");
+  const authErrorMessage = document.getElementById("authErrorMessage");
+  const authWarningMessage = document.getElementById("authWarningMessage");
+  const btnSubmitAuth = document.getElementById("btnSubmitAuth");
+  const authModalTitle = document.getElementById("authModalTitle");
+  const authToggleText = document.getElementById("authToggleText");
+  const authToggleLink = document.getElementById("authToggleLink");
+
+  let isSignUpMode = false;
+
+  if (btnShowAuth) {
+    btnShowAuth.addEventListener("click", () => {
+      isSignUpMode = false;
+      updateAuthModalUI();
+      authErrorMessage.style.display = "none";
+      authEmail.value = "";
+      authPassword.value = "";
+      
+      const isClientReady = !!(window.dsaSupabase && window.dsaSupabase.client);
+      if (!isClientReady) {
+        if (authWarningMessage) {
+          authWarningMessage.textContent = "⚠️ Supabase configuration required. Please define SUPABASE_URL and SUPABASE_ANON_KEY in a .env.local file at the root, then restart the server to enable cloud progress tracking.";
+          authWarningMessage.style.display = "block";
+        }
+        authEmail.disabled = true;
+        authPassword.disabled = true;
+        btnSubmitAuth.disabled = true;
+        if (authToggleLink) {
+          authToggleLink.style.pointerEvents = "none";
+          authToggleLink.style.opacity = "0.5";
+        }
+      } else {
+        if (authWarningMessage) {
+          authWarningMessage.style.display = "none";
+        }
+        authEmail.disabled = false;
+        authPassword.disabled = false;
+        btnSubmitAuth.disabled = false;
+        if (authToggleLink) {
+          authToggleLink.style.pointerEvents = "auto";
+          authToggleLink.style.opacity = "1";
+        }
+      }
+      
+      authModalOverlay.classList.add("active");
+    });
+  }
+
+  if (closeAuthBtn) {
+    closeAuthBtn.addEventListener("click", () => {
+      authModalOverlay.classList.remove("active");
+    });
+  }
+
+  if (authToggleLink) {
+    authToggleLink.addEventListener("click", () => {
+      isSignUpMode = !isSignUpMode;
+      updateAuthModalUI();
+    });
+  }
+
+  const updateAuthModalUI = () => {
+    if (isSignUpMode) {
+      authModalTitle.textContent = "Create Account";
+      btnSubmitAuth.textContent = "Sign Up";
+      authToggleText.textContent = "Already have an account?";
+      authToggleLink.textContent = "Sign In";
+      if (confirmPasswordGroup) confirmPasswordGroup.style.display = "flex";
+      if (authConfirmPassword) authConfirmPassword.required = true;
+    } else {
+      authModalTitle.textContent = "Sign In";
+      btnSubmitAuth.textContent = "Sign In";
+      authToggleText.textContent = "Don't have an account?";
+      authToggleLink.textContent = "Sign Up";
+      if (confirmPasswordGroup) confirmPasswordGroup.style.display = "none";
+      if (authConfirmPassword) {
+        authConfirmPassword.required = false;
+        authConfirmPassword.value = "";
+      }
+    }
+  };
+
+  if (authForm) {
+    authForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const email = authEmail.value.trim();
+      const password = authPassword.value;
+      
+      btnSubmitAuth.disabled = true;
+      btnSubmitAuth.textContent = isSignUpMode ? "Signing Up..." : "Signing In...";
+      authErrorMessage.style.display = "none";
+
+      if (isSignUpMode) {
+        const confirmPassword = authConfirmPassword ? authConfirmPassword.value : "";
+        if (password !== confirmPassword) {
+          authErrorMessage.textContent = "Passwords do not match.";
+          authErrorMessage.style.display = "block";
+          btnSubmitAuth.disabled = false;
+          btnSubmitAuth.textContent = "Sign Up";
+          if (authConfirmPassword) authConfirmPassword.focus();
+          return;
+        }
+      }
+
+      try {
+        if (isSignUpMode) {
+          await window.dsaSupabase.signUp(email, password);
+          alert("Account created successfully! Please sign in.");
+          isSignUpMode = false;
+          updateAuthModalUI();
+        } else {
+          await window.dsaSupabase.signIn(email, password);
+          authModalOverlay.classList.remove("active");
+        }
+      } catch (err) {
+        authErrorMessage.textContent = err.message || "An authentication error occurred.";
+        authErrorMessage.style.display = "block";
+      } finally {
+        btnSubmitAuth.disabled = false;
+        btnSubmitAuth.textContent = isSignUpMode ? "Sign Up" : "Sign In";
+      }
+    });
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener("click", async () => {
+      try {
+        await window.dsaSupabase.signOut();
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  }
+
+  const handleAuthStateChange = async () => {
+    if (currentUser) {
+      if (btnShowAuth) btnShowAuth.style.display = "none";
+      if (userProfileMenu) userProfileMenu.style.display = "flex";
+      if (userEmailDisplay) userEmailDisplay.textContent = currentUser.email;
+
+      const dbProgress = await window.dsaSupabase.fetchProgress(currentUser.id);
+      const localProgress = Array.from(masteredPatterns);
+      if (localProgress.length > 0) {
+        await window.dsaSupabase.syncProgress(currentUser.id, localProgress);
+        dbProgress.forEach(id => masteredPatterns.add(id));
+        saveMasteredState();
+      } else {
+        masteredPatterns = new Set(dbProgress);
+        saveMasteredState();
+      }
+    } else {
+      if (btnShowAuth) btnShowAuth.style.display = "flex";
+      if (userProfileMenu) userProfileMenu.style.display = "none";
+      if (userEmailDisplay) userEmailDisplay.textContent = "";
+      loadMasteredState();
+    }
+
+    updateProgressStats();
+    renderPatterns();
+    renderTreeLayout();
+  };
+
+  const initSupabaseAuth = async () => {
+    const active = await window.dsaSupabase.init();
+    if (!active) {
+      currentUser = null;
+      await handleAuthStateChange();
+      return;
+    }
+
+    window.dsaSupabase.onAuthStateChange(async (event, session) => {
+      currentUser = session?.user || null;
+      await handleAuthStateChange();
+    });
+
+    currentUser = await window.dsaSupabase.getCurrentUser();
+    await handleAuthStateChange();
+  };
+
   // 12. Startup Dashboard
   loadMasteredState();
   initTreeStates();
@@ -1002,19 +1339,18 @@ document.addEventListener("DOMContentLoaded", () => {
   renderPatterns();
   updateProgressStats();
   initMobileViewToggle();
+  initSupabaseAuth();
 
   // Redraw connections and re-center on window resize
   window.addEventListener("resize", () => {
+    const mainEl = document.querySelector("main");
     if (window.innerWidth > 1024) {
-      container.classList.remove("mobile-hide-view");
-      explorerContainer.classList.remove("mobile-hide-view");
+      if (mainEl) mainEl.classList.remove("view-explorer");
     } else {
-      if (dockBtnMap && dockBtnMap.classList.contains("active")) {
-        container.classList.remove("mobile-hide-view");
-        explorerContainer.classList.add("mobile-hide-view");
-      } else if (dockBtnExplorer && dockBtnExplorer.classList.contains("active")) {
-        container.classList.add("mobile-hide-view");
-        explorerContainer.classList.remove("mobile-hide-view");
+      if (dockBtnExplorer && dockBtnExplorer.classList.contains("active")) {
+        if (mainEl) mainEl.classList.add("view-explorer");
+      } else {
+        if (mainEl) mainEl.classList.remove("view-explorer");
       }
     }
     renderTreeLayout();
