@@ -14,12 +14,12 @@ const MIME_TYPES = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon'
 };
-"// Load environment variables from .env.local
+
+// Load environment variables from .env.local
 const loadEnv = () => {
   const envPath = path.join(__dirname, '.env.local');
   if (fs.existsSync(envPath)) {
-    const lines = fs.readFileSync(envPath, 'utf8').split('\
-');
+    const lines = fs.readFileSync(envPath, 'utf8').split('\n');
     lines.forEach(line => {
       const trimmed = line.trim();
       if (trimmed && !trimmed.startsWith('#')) {
@@ -31,19 +31,27 @@ const loadEnv = () => {
             val = val.slice(1, -1);
           }
           process.env[key] = val;
-          console.log(`Loaded Env: ${key} = ${key === 'GITHUB_CLIENT_SECRET' ? '***' : val}`);
+          console.log(`Loaded Env: ${key}`);
         }
       }
     });
   }
 };
 loadEnv();
-console.log('Loaded GITHUB_CLIENT_ID:', process.env.GITHUB_CLIENT_ID);
 
 const server = http.createServer((req, res) => {
   console.log(`[Request]: ${req.method} ${req.url}`);
 
   // Handle API Requests
+  if (req.method === 'GET' && req.url === '/api/config') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      supabaseUrl: process.env.SUPABASE_URL || '',
+      supabaseAnonKey: process.env.SUPABASE_ANON_KEY || ''
+    }));
+    return;
+  }
+
   if (req.method === 'GET' && req.url === '/api/github/client-id') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     if (!process.env.GITHUB_CLIENT_ID || process.env.GITHUB_CLIENT_ID === 'your_github_client_id') {
@@ -59,21 +67,27 @@ const server = http.createServer((req, res) => {
     req.on('data', chunk => {
       body += chunk.toString();
     });
-    req.on('end', async () => {
+    req.on('end', () => {
       try {
         const { code } = JSON.parse(body);
-        
-        // Demo mode fallback
-        if (!process.env.GITHUB_CLIENT_ID || process.env.GITHUB_CLIENT_ID === 'your_github_client_id' || code === 'demo') {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            success: true,
-            isDemo: true,
-            user: {
-              login: "Veerababu-Demo",
-              name: "Veerababu Jakkula (Demo)",
-              avatar_url: "https://github.com/ide
-<truncated 1930 bytes>
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          success: true,
+          isDemo: true,
+          user: {
+            login: "Veerababu-Demo",
+            name: "Veerababu Jakkula (Demo)",
+            avatar_url: "https://github.com/github.png"
+          },
+          token: "mock-jwt-token"
+        }));
+      } catch (err) {
+        res.writeHead(400, { 'Content-Type': 'text/plain' });
+        res.end('Bad Request');
+      }
+    });
+    return;
+  }
 
   // Clean query strings or hash parameters first
   let filePath = req.url.split('?')[0].split('#')[0];

@@ -1382,8 +1382,11 @@ footer {
 
 @media (max-width: 1024px) {
   body {
-    height: 100vh !important;
-    overflow: hidden !important;
+    overflow-x: hidden;
+  }
+  
+  .app-wrapper {
+    overflow: hidden;
   }
   
   header {
